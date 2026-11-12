@@ -1,0 +1,40 @@
+{
+  "yolov8m_seg_aug": {
+    "metric": "mask AP50",
+    "value": 0.187115,
+    "interval": [
+      0.124877,
+      0.279387
+    ],
+    "split": "validation images from capture sessions not seen in training (session split)",
+    "seed": 0,
+    "evaluator": "benchmark evaluator, 95% session bootstrap interval",
+    "source": "fabrid-benchmark/results/evaluation/yolov8m_aug_session_seed0/metrics.json",
+    "field": "mask_ap50.mean",
+    "default_threshold": {
+      "value": 0.2,
+      "rule": "mean of the per class f1_threshold values, rounded to the nearest 0.05",
+      "source": "fabrid-benchmark/results/evaluation/yolov8m_aug_session_seed0/per_class.csv",
+      "column": "f1_threshold"
+    }
+  },
+  "fabrimssa_net": {
+    "metric": "mask AP50",
+    "value": 0.181891,
+    "interval": [
+      0.126979,
+      0.254275
+    ],
+    "split": "validation images from capture sessions not seen in training (session split)",
+    "seed": 0,
+    "evaluator": "benchmark evaluator, 95% session bootstrap interval",
+    "source": "fabrid-benchmark/results/evaluation/hybrid_anchors_mssa_aux_session_seed0/metrics.json",
+    "field": "mask_ap50.mean",
+    "default_threshold": {
+      "value": 0.65,
+      "rule": "mean of the per class f1_threshold values, rounded to the nearest 0.05",
+      "source": "fabrid-benchmark/results/evaluation/hybrid_anchors_mssa_aux_session_seed0/per_class.csv",
+      "column": "f1_threshold"
+    }
+  }
+}
