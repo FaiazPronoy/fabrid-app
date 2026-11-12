@@ -12,6 +12,6 @@ LIMITS = (
 )
 
 HISTORY_NOTE = (
-    "History is kept for this browser session only, on the server's local disk. A free "
-    "Hugging Face Space loses it whenever the Space restarts."
+    "History is kept for this browser session only, on the server's disk, and is lost when "
+    "the server restarts."
 )

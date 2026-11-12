@@ -38,6 +38,7 @@ class Result:
     classes: list[str] | None = None
     model_key: str | None = None
     light: bool = False
+    skipped: bool = False
 
 
 def clean_classes(classes) -> list[str]:
@@ -197,13 +198,17 @@ class Workspace:
         self.remember(session, analysis)
         return analysis
 
-    def refilter(self, session: str, entry: str | None, threshold, classes) -> Result:
+    def refilter(
+        self, session: str, entry: str | None, threshold, classes, model_key: str | None = None
+    ) -> Result:
         try:
             analysis = self.lookup(session, entry)
         except Exception as error:
             return Result(False, f"The stored analysis could not be read: {error}")
         if analysis is None:
             return Result(False, "Analyse a photo first.")
+        if model_key is not None and model_key != analysis.model_key:
+            return Result(True, "", entry=analysis.entry, light=True, skipped=True)
         analysis.threshold = clamp(threshold)
         analysis.classes = clean_classes(classes)
         try:
@@ -226,9 +231,9 @@ class Workspace:
         annotated = annotate(analysis.work, shown)
         exports = self.history.folder(session, analysis.entry) / "exports"
         exports.mkdir(parents=True, exist_ok=True)
-        png = exports / f"annotated-{analysis.entry}.png"
+        png = exports / "annotated.png"
         Image.fromarray(annotated).save(png)
-        csv_path = write_csv(shown, analysis.size, exports / f"results-{analysis.entry}.csv")
+        csv_path = write_csv(shown, analysis.size, exports / "results.csv")
         return Result(
             ok=True,
             message=summary(analysis),
@@ -258,7 +263,7 @@ class Workspace:
             path = report.write(
                 analysis,
                 card.headline(self.cards.get(analysis.model_key)),
-                folder / f"report-{analysis.entry}.pdf",
+                folder / "report.pdf",
             )
         except Exception as error:
             traceback.print_exc()

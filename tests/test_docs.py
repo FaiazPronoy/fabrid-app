@@ -41,6 +41,19 @@ def test_no_hugging_face_space_setup_left():
     assert not (ROOT / "packages.txt").exists()
 
 
+def test_no_hosting_specific_wording_in_texts():
+    from defects import texts
+
+    shown = [texts.TITLE, texts.INTRO, texts.LIMITS, texts.HISTORY_NOTE]
+    sources = [
+        README,
+        *[path.read_text(encoding="utf-8") for path in (ROOT / "defects").glob("*.py")],
+    ]
+    for text in shown + sources:
+        assert not re.search(r"Hugging ?Face|\bSpaces?\b|hf\.space", text), text[:80]
+    assert "lost when the server restarts" in texts.HISTORY_NOTE
+
+
 def test_weights_are_ignored_by_git():
     ignored = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
     assert "weights/*.pt" in ignored and "weights/*.pth" in ignored

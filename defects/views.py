@@ -24,6 +24,10 @@ def frame(listed: list[list]) -> pd.DataFrame:
 
 
 def values(result: Result, session: str, entry: str, clear: bool, keep) -> dict:
+    if result.skipped:
+        kept = dict.fromkeys(FULL, keep)
+        kept.update(session=session, entry=entry)
+        return kept
     if result.ok:
         return {
             "session": session,

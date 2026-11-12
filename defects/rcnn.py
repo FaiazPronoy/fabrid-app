@@ -15,7 +15,8 @@ class TorchvisionPredictor:
     def tensor(self, pixels: np.ndarray):
         import torch
 
-        return torch.from_numpy(np.ascontiguousarray(pixels)).permute(2, 0, 1).float() / 255
+        owned = np.array(pixels, copy=True, order="C")
+        return torch.from_numpy(owned).permute(2, 0, 1).float() / 255
 
     def predict(self, pixels: np.ndarray) -> list[Instance]:
         import torch

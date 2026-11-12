@@ -73,12 +73,12 @@ def build(workspace: Workspace, samples: list[Path] | None = None) -> gr.Blocks:
         )
         return shown
 
-    def on_filter(threshold, classes, session, entry):
+    def on_filter(threshold, classes, key, session, entry):
         session = workspace.session(session)
         if not entry:
             return views.unchanged(session, entry, views.LIGHT, gr.update())
         shown, _ = respond(
-            lambda: workspace.refilter(session, entry, threshold, classes),
+            lambda: workspace.refilter(session, entry, threshold, classes, key),
             session,
             entry,
             False,
@@ -230,13 +230,13 @@ def build(workspace: Workspace, samples: list[Path] | None = None) -> gr.Blocks:
         ).then(on_listing, inputs=session, outputs=[session, chosen, gallery])
         threshold.change(
             on_filter,
-            inputs=[threshold, classes, session, entry],
+            inputs=[threshold, classes, model, session, entry],
             outputs=light,
             trigger_mode="always_last",
         )
         classes.change(
             on_filter,
-            inputs=[threshold, classes, session, entry],
+            inputs=[threshold, classes, model, session, entry],
             outputs=light,
             trigger_mode="always_last",
         )
