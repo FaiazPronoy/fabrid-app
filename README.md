@@ -61,8 +61,11 @@ Each run:
 2. Open the running version (the notebook's Versions list, or View Active Events) and watch its
    log. The launcher prints, in order: the Python version; which torch and torchvision are kept
    from Kaggle or installed from the pins; the installed version of every pinned package; the
-   weights folder it found; the full `python -m defects.check` report; then the app's start log.
-   If the check ends with `NOT READY`, a framed warning is printed and the app starts anyway.
+   weights folder it found; the full `python -m defects.check` report; the result of the
+   interface check `python -m defects.uicheck`; then the app's start log. If the readiness check
+   ends with `NOT READY`, a framed warning is printed and the app starts anyway. If the interface
+   check fails, a framed warning is printed and the classic interface starts instead, so there is
+   always a page.
 3. Search the log for the line that starts with `PUBLIC URL:`. That `https://...gradio.live`
    address is the app; open it on the phone and on the projector laptop.
 4. The link changes on every run, so share it only after the run has started. Kaggle stops a
@@ -81,8 +84,15 @@ that Kaggle already has when their versions match the pins (ignoring the build s
 
 ```
 python -m defects.check --weights <folder> --data /kaggle/working/data
+python -m defects.uicheck
 python app.py --share --weights <folder> --data /kaggle/working/data
 ```
+
+`python -m defects.uicheck` builds the interface with a stand-in model, calls every event
+handler once with realistic inputs (analyse, filters, mark style, model change, report, compare,
+history open and clear, dashboard), checks the number of values each returns, and starts and stops
+the server once with the real theme, stylesheet and script. It prints `UI CHECK PASSED` or names
+each handler that failed. When it fails the launcher adds `--classic` to the app command.
 
 ## Run locally
 
@@ -106,6 +116,7 @@ Open http://127.0.0.1:7860. Options, each also readable from the environment:
 | `--share` | | also create a public Gradio link |
 | `--lan` | | listen on the local network so a phone can open `http://<computer IP>:7860` |
 | `--port N` | | port (default 7860) |
+| `--classic` | | start the previous, plain interface instead of the redesigned one |
 
 After start the app prints `PUBLIC URL: <address>` (with `--share`) or `LOCAL URL: <address>` on
 its own line. If `--share` was given but no link could be made, it prints a warning instead.
@@ -182,16 +193,20 @@ then start it with `python app.py --lan` and leave it running.
 
 **3. What to show, in this order.**
 
-1. Analyse tab, YOLOv8m-seg selected. Click a picture in the row "Validation images from the
-   dataset, from capture sessions not used in training", press Analyse. Point out the masks, the
-   class and confidence on each, the table, the counts and the inference time.
-2. Move the confidence slider and untick a class: the result changes at once, the model is not
-   run again.
-3. Choose FabriMSSA-Net (the slider jumps to its validated default) and analyse the same image.
-4. Open Model input to show exactly what the model receives.
-5. Take a live photo of a fabric sample with the phone and analyse it.
-6. Create the PDF report, then show the History tab (reopen an analysis) and the Dashboard tab.
-7. End on the About tab: limits, verification status and where each figure comes from.
+1. Point at the header: each model's chip says Verified.
+2. Inspect tab, YOLOv8m-seg selected. Click an example image under step 1, press Analyse. Read
+   the verdict banner, the four class tiles, then drag the before and after handle. Open Defect
+   close-ups and Defect details.
+3. Open Display and advanced settings: move the confidence slider, untick a class, switch the
+   mark style. The result changes at once; the model is not run again.
+4. Choose FabriMSSA-Net (the slider jumps to its validated default) and analyse the same image.
+   Open Model input to show exactly what the model receives.
+5. Compare tab: run both models on one photo and read the agreement line, which says it is not an
+   accuracy measurement.
+6. Take a live photo of a fabric sample with the phone and analyse it in Inspect.
+7. Downloads: create the PDF report. Then History (open an earlier card) and Dashboard.
+8. End on the About tab: the defect types, the models with their figures and sources,
+   verification and the limits.
 
 **4. What to say about accuracy.** On validation fabric from capture sessions the models never
 saw, both reach a mask AP50 of about 0.18 to 0.19, single seed, with wide 95% intervals that
@@ -238,36 +253,52 @@ page as reopened, with no new inference run.
 
 ## Features
 
-* Analyse tab: photo from the gallery or the camera, model choice with its validation figure,
-  original and annotated image side by side, table of detections (class, confidence, box, mask
-  area in pixels and as a share of the image), count per class and total, inference time.
-* Examples row under the photo input, labelled "Validation images from the dataset, from capture
-  sessions not used in training": the images found in `reference/*/images/`, one per file name.
-  Clicking one only loads it as the photo; Analyse then runs the model on it like any upload.
-  Nothing is precomputed. Without reference images the row is not shown.
-* Confidence threshold slider and class filter: both re-filter the stored predictions without
-  running the model again, and only the annotated image, summary, table and export files are
-  sent back to the browser. Detections down to confidence 0.05 are kept for this. Choosing a
-  model sets the slider to that model's default threshold (see Accuracy figures).
+The page has a header with the project title, an optional subtitle, institution, team and
+supervisor lines from `branding.json` (empty fields are not shown), and one status chip per model:
+Verified, Not verified or Unavailable. Tap or hover a chip for the reason. A short limits line sits
+under every tab. The page always uses one light theme, whatever the visitor's system setting, and
+the four class colours (needle mark wine, hole blue, missing yarn sand, stain green) are used for
+the tiles, table chips, marks and charts. They were chosen so that every pair stays at least 20
+CIELAB units apart under simulated protanopia, deuteranopia and tritanopia, and every label and
+text colour reaches a contrast ratio of at least 4.5 to 1; `defects/palette.py` holds the check.
+
+* Inspect tab, the default. Left: step 1 Photo (upload, camera, and the example strip "Validation
+  images from the dataset, from capture sessions not used in training", built from
+  `reference/*/images/`; clicking one only loads it, nothing is precomputed), step 2 Model (one
+  line per model with its status and validation figure, and "More about this model" with the full
+  card and limits), step 3 a large Analyse button that is disabled while a model runs, and a
+  collapsed "Display and advanced settings" with the confidence threshold, classes to show, mark
+  style and the contrast option. Right: a friendly empty state until the first analysis, then a
+  green or amber verdict banner with model, inference time and analysis size, four class tiles,
+  a before and after slider (full screen and download buttons), and the expanders Defect details,
+  Defect close-ups, Model input and Downloads. A failed analysis replaces the verdict with an error
+  card and hides the old result.
+* Marks are drawn on the display image (long side up to 2048 px), not at 640 px: boxes and masks
+  are scaled from analysis coordinates (masks with nearest neighbour), and label text is sized from
+  the image on a solid background. Mark styles: Mask and box, Box only, Outline, Circle. Reported
+  coordinates and areas stay in analysis pixels.
+* Threshold, class filter and mark style re-draw the stored predictions without running the model
+  again. An analysis is only re-filtered under its own model, and the slider shows the analysis'
+  own threshold when its model is selected (also after reopening from history).
+* Compare tab: one photo, every available model in turn with its own default threshold, side by
+  side, with a neutral line on where the class counts agree and differ, and the note that this is
+  not an accuracy measurement. Each run is saved to history.
+* History tab: cards with thumbnail, time, model, verdict and counts; pick one and Open loads it
+  into Inspect; Clear this session asks for confirmation first.
+* Dashboard tab: tiles for analyses, defects shown and most frequent class above the charts of
+  defects per class, defects per image and confidence.
+* About tab: what the app does, the four defect types with their colours, the models with their
+  figures and sources from `model_card.json`, how verification works, the limits, and the team.
 * Analysis size: the photo is scaled with antialiasing (Lanczos) so its long side is at most the
-  model's input size from the registry (640 px for both models); smaller photos are not
-  enlarged. Boxes, mask areas, the table, the CSV and the annotated image all use this size.
-* Contrast stretch checkbox, off by default: rescales brightness between the 2nd and 98th
-  percentile of the photo before inference, as an approximation of the "auto contrast via
-  contrast stretching" step of the Roboflow export the models were trained on. Its settings in
-  that export are unknown and this approximation has not been validated. Whether it was used is
-  shown in the summary and stored in the history and the PDF report; its effect is visible in
-  the Model input view.
-* Model input view: the image exactly as the model receives it (Mask R-CNN resized and padded,
-  with the channel normalisation undone for display; YOLO letterboxed by Ultralytics).
-* Downloads: annotated image as PNG, table as CSV, and a PDF report (both images, the table,
-  model, threshold, date).
-* History tab: every analysis of the current browser session, with thumbnail, time, model,
-  threshold and counts, can be reopened.
-* Dashboard tab: defects per class, defects per image, and the confidence distribution over the
-  session history.
-* About tab: limits, verification status, the validation figure and default threshold of each
-  model and the files they come from.
+  model's input size from the registry (640 px for both models); smaller photos are not enlarged.
+* Contrast option, off by default: rescales brightness between the 2nd and 98th percentile of the
+  photo before inference, as an approximation of the "auto contrast via contrast stretching" step
+  of the Roboflow export the models were trained on. Its settings in that export are unknown and
+  this approximation has not been validated. Whether it was used is shown in the verdict and stored
+  in the history and the PDF report; its effect is visible in the Model input view.
+* PDF report: branding, the verdict line, both images, the class tiles, the run details and the
+  limits on page one, the defect table on page two.
+* `python app.py --classic` starts the previous plain interface, kept in `defects/classic.py`.
 
 ## History storage
 
@@ -369,7 +400,16 @@ The interface reads the registry, so it needs no change.
 | `defects/verify.py` | checking each model against its reference pack |
 | `defects/check.py` | readiness report for the demo, `python -m defects.check` |
 | `defects/examples.py` | the example images listed under the photo input |
-| `defects/views.py` | which values each interface event sends back |
-| `defects/ui.py` | the Gradio interface |
+| `defects/views.py` | which values each classic interface event sends back |
+| `defects/screens.py` | which values each redesigned interface event sends back |
+| `defects/summary.py` | verdict, class tiles, compare sentence, history captions, HTML pieces |
+| `defects/marks.py` | marks drawn at display resolution in four styles |
+| `defects/closeups.py` | close-up crops of each shown defect |
+| `defects/palette.py` | theme and class colours with the contrast and colour blindness check |
+| `defects/branding.py`, `branding.json` | title, subtitle, institution, team and supervisor |
+| `defects/style.css` | the stylesheet of the redesigned interface |
+| `defects/ui.py` | the redesigned Gradio interface |
+| `defects/classic.py` | the previous interface, `python app.py --classic` |
+| `defects/uicheck.py` | calls every interface handler once, `python -m defects.uicheck` |
 | `reference/` | reference packs from the benchmark |
 | `tests/` | tests with synthetic images and a fake predictor |

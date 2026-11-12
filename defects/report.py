@@ -1,14 +1,24 @@
+import textwrap
 from datetime import datetime
 from pathlib import Path
 
 import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.figure import Figure
+from matplotlib.patches import FancyBboxPatch
 
-from defects.draw import annotate
+from defects import marks, summary
+from defects.branding import Branding
 from defects.history import Analysis
-from defects.table import counts, rows
+from defects.palette import ACCENT, MUTED, TEXT, VERDICTS, hexcode
+from defects.table import rows
 from defects.texts import LIMITS
+
+A4 = (8.27, 11.69)
+ROWS_PER_PAGE = 40
+HEADERS = ("no.", "class", "confidence", "x0", "y0", "x1", "y1", "area (px)", "area (%)")
+WIDTHS = (0.06, 0.18, 0.12, 0.09, 0.09, 0.09, 0.09, 0.14, 0.14)
+LEFT = 0.07
 
 
 def stretch_line(used: bool) -> str:
@@ -17,15 +27,7 @@ def stretch_line(used: bool) -> str:
     return "Contrast stretch before inference: off"
 
 
-A4 = (8.27, 11.69)
-ROWS_PER_PAGE = 32
-HEADERS = ("no.", "class", "confidence", "x0", "y0", "x1", "y1", "area (px)", "area (%)")
-WIDTHS = (0.06, 0.18, 0.12, 0.09, 0.09, 0.09, 0.09, 0.14, 0.14)
-
-
 def heading(analysis: Analysis, headline: str, now: datetime) -> list[str]:
-    shown = analysis.shown()
-    tally = ", ".join(f"{name} {n}" for name, n in counts(shown).items())
     width, height = analysis.size
     return [
         f"Model: {analysis.model_name}",
@@ -34,35 +36,136 @@ def heading(analysis: Analysis, headline: str, now: datetime) -> list[str]:
         f"Analysed: {analysis.created.replace('T', ' ')}",
         f"Report created: {now:%Y-%m-%d %H:%M:%S}",
         f"Inference time: {analysis.seconds:.2f} s on CPU, analysis size {width} x {height} px",
-        f"Defects shown: {len(shown)} ({tally})",
         stretch_line(analysis.stretch),
         headline,
     ]
 
 
-def first_page(analysis: Analysis, headline: str, now: datetime) -> Figure:
+def color(rgb) -> tuple[float, float, float]:
+    return tuple(v / 255 for v in rgb)
+
+
+def header(figure: Figure, branding: Branding) -> float:
+    figure.text(LEFT, 0.955, branding.title, fontsize=17, weight="bold", color=color(TEXT))
+    top = 0.935
+    if branding.subtitle:
+        figure.text(LEFT, top, branding.subtitle, fontsize=9.5, color=color(MUTED))
+        top -= 0.017
+    for line in branding.lines():
+        figure.text(LEFT, top, line, fontsize=8.5, color=color(MUTED))
+        top -= 0.015
+    figure.add_artist(
+        FancyBboxPatch(
+            (LEFT, top - 0.004),
+            0.86,
+            0.0015,
+            boxstyle="square,pad=0",
+            transform=figure.transFigure,
+            color=color(ACCENT),
+        )
+    )
+    return top - 0.02
+
+
+def banner(figure: Figure, verdict: dict, top: float) -> float:
+    colors = VERDICTS[verdict["kind"]]
+    figure.add_artist(
+        FancyBboxPatch(
+            (LEFT, top - 0.05),
+            0.86,
+            0.048,
+            boxstyle="round,pad=0.004",
+            transform=figure.transFigure,
+            facecolor=color(colors["fill"]),
+            edgecolor=color(colors["edge"]),
+            linewidth=1.2,
+        )
+    )
+    figure.text(
+        LEFT + 0.015,
+        top - 0.02,
+        verdict["title"],
+        fontsize=13,
+        weight="bold",
+        color=color(colors["text"]),
+    )
+    figure.text(
+        LEFT + 0.015, top - 0.04, verdict["detail"], fontsize=8.5, color=color(colors["text"])
+    )
+    return top - 0.07
+
+
+def tile_row(figure: Figure, tiles: list[dict], top: float) -> float:
+    width = 0.86 / len(tiles)
+    for index, tile in enumerate(tiles):
+        x = LEFT + index * width
+        fill = (0.93, 0.945, 0.96) if tile["muted"] else tile["color"]
+        ink = (0.37, 0.41, 0.46) if tile["muted"] else tile["text"]
+        figure.add_artist(
+            FancyBboxPatch(
+                (x + 0.005, top - 0.055),
+                width - 0.01,
+                0.05,
+                boxstyle="round,pad=0.003",
+                transform=figure.transFigure,
+                facecolor=fill,
+                edgecolor="none",
+            )
+        )
+        figure.text(
+            x + width / 2,
+            top - 0.027,
+            str(tile["count"]),
+            fontsize=15,
+            weight="bold",
+            ha="center",
+            color=ink,
+        )
+        figure.text(x + width / 2, top - 0.047, tile["name"], fontsize=8, ha="center", color=ink)
+    return top - 0.07
+
+
+def first_page(analysis: Analysis, headline: str, now: datetime, branding: Branding) -> Figure:
     figure = Figure(figsize=A4)
-    figure.text(0.07, 0.95, "Fabric defect analysis", fontsize=18, weight="bold")
-    lines = heading(analysis, headline, now)
-    for index, line in enumerate(lines):
-        figure.text(0.07, 0.91 - index * 0.022, line, fontsize=9, wrap=True)
-    annotated = annotate(analysis.work, analysis.shown())
+    top = header(figure, branding)
+    top = banner(figure, summary.verdict(analysis), top)
+    shown = analysis.shown()
+    annotated = marks.render(analysis.display, shown, analysis.size, marks.DEFAULT_STYLE)
+    image_top = top - 0.01
     for position, (title, pixels) in enumerate(
-        (("Original", np.asarray(analysis.display)), ("Annotated", annotated))
+        (("Original", np.asarray(analysis.display)), ("Detected defects", annotated))
     ):
-        ax = figure.add_axes((0.05 + position * 0.47, 0.30, 0.43, 0.38))
+        ax = figure.add_axes((LEFT + position * 0.44, image_top - 0.25, 0.42, 0.24))
         ax.imshow(pixels)
-        ax.set_title(title, fontsize=10)
+        ax.set_title(title, fontsize=9.5, color=color(TEXT))
         ax.axis("off")
-    figure.text(0.07, 0.22, "Limits", fontsize=10, weight="bold")
-    figure.text(0.07, 0.205, LIMITS, fontsize=8, wrap=True, va="top")
+    top = tile_row(figure, summary.tiles(shown, analysis.classes), image_top - 0.265)
+    lines = heading(analysis, headline, now)
+    for index, line in enumerate(lines[:-1]):
+        figure.text(LEFT, top - index * 0.018, line, fontsize=8.5, color=color(TEXT), va="top")
+    card_top = top - (len(lines) - 1) * 0.018 - 0.004
+    wrapped = textwrap.fill(lines[-1], 110)
+    figure.text(LEFT, card_top, wrapped, fontsize=8.5, color=color(TEXT), va="top")
+    limits_top = card_top - 0.05
+    figure.text(LEFT, limits_top, "Limits", fontsize=10, weight="bold", color=color(TEXT), va="top")
+    figure.text(
+        LEFT, limits_top - 0.02, LIMITS, fontsize=8, wrap=True, va="top", color=color(MUTED)
+    )
     return figure
 
 
-def table_page(chunk: list[list], page: int, pages: int) -> Figure:
+def table_page(chunk: list[list], page: int, pages: int, branding: Branding) -> Figure:
     figure = Figure(figsize=A4)
-    figure.text(0.07, 0.95, f"Detections (page {page} of {pages})", fontsize=12, weight="bold")
-    ax = figure.add_axes((0.05, 0.05, 0.9, 0.87))
+    figure.text(LEFT, 0.955, branding.title, fontsize=10, color=color(MUTED))
+    figure.text(
+        LEFT,
+        0.93,
+        f"Detections (page {page} of {pages})",
+        fontsize=13,
+        weight="bold",
+        color=color(TEXT),
+    )
+    ax = figure.add_axes((0.05, 0.05, 0.9, 0.86))
     ax.axis("off")
     if not chunk:
         ax.text(0.0, 0.98, "No defect found above the threshold.", fontsize=10, va="top")
@@ -75,18 +178,30 @@ def table_page(chunk: list[list], page: int, pages: int) -> Figure:
         cellLoc="center",
     )
     table.auto_set_font_size(False)
-    table.set_fontsize(7)
+    table.set_fontsize(7.5)
     table.scale(1, 1.3)
+    for (row, _), cell in table.get_celld().items():
+        cell.set_edgecolor(hexcode((226, 231, 238)))
+        if row == 0:
+            cell.set_facecolor(hexcode((238, 241, 245)))
+            cell.set_text_props(weight="bold")
     return figure
 
 
-def write(analysis: Analysis, headline: str, path: Path, now: datetime | None = None) -> Path:
+def write(
+    analysis: Analysis,
+    headline: str,
+    path: Path,
+    now: datetime | None = None,
+    branding: Branding | None = None,
+) -> Path:
     now = now or datetime.now()
+    branding = branding or Branding()
     listed = rows(analysis.shown(), analysis.size)
     chunks = [listed[i : i + ROWS_PER_PAGE] for i in range(0, len(listed), ROWS_PER_PAGE)] or [[]]
     path.parent.mkdir(parents=True, exist_ok=True)
     with PdfPages(path) as pdf:
-        pdf.savefig(first_page(analysis, headline, now))
+        pdf.savefig(first_page(analysis, headline, now, branding))
         for page, chunk in enumerate(chunks, start=1):
-            pdf.savefig(table_page(chunk, page, len(chunks)))
+            pdf.savefig(table_page(chunk, page, len(chunks), branding))
     return path

@@ -6,7 +6,8 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from defects import card, charts, imageio, report
+from defects import card, charts, closeups, imageio, marks, report, summary
+from defects.branding import Branding
 from defects.draw import annotate
 from defects.history import Analysis, History, session_id
 from defects.labels import CLASSES
@@ -39,6 +40,10 @@ class Result:
     model_key: str | None = None
     light: bool = False
     skipped: bool = False
+    verdict: dict | None = None
+    tiles: list[dict] = field(default_factory=list)
+    closeups: list[tuple[np.ndarray, str]] = field(default_factory=list)
+    style: str | None = None
 
 
 def clean_classes(classes) -> list[str]:
@@ -56,7 +61,7 @@ def stretch_text(used: bool) -> str:
     return "Contrast stretch before inference: off."
 
 
-def summary(analysis: Analysis) -> str:
+def text_summary(analysis: Analysis) -> str:
     shown = analysis.shown()
     tally = counts(shown)
     threshold = f"{analysis.threshold:.2f}"
@@ -92,10 +97,11 @@ def summary(analysis: Analysis) -> str:
 
 
 class Workspace:
-    def __init__(self, slots: dict, history: History, cards: dict):
+    def __init__(self, slots: dict, history: History, cards: dict, branding=None):
         self.slots = slots
         self.history = history
         self.cards = cards
+        self.branding = branding or Branding()
         self.current: dict[str, Analysis] = {}
 
     @staticmethod
@@ -140,7 +146,9 @@ class Workspace:
         slot = self.slots.get(key)
         return slot.spec.default_threshold if slot else 0.5
 
-    def analyse(self, session: str, source, key: str, threshold, classes, stretch=False) -> Result:
+    def analyse(
+        self, session: str, source, key: str, threshold, classes, stretch=False, style=None
+    ) -> Result:
         slot = self.slots.get(key)
         if slot is None:
             return Result(False, "Choose a model first.")
@@ -186,7 +194,7 @@ class Workspace:
             traceback.print_exc()
             return Result(False, f"The result could not be saved: {error}")
         self.remember(session, analysis)
-        return self.render(session, analysis)
+        return self.render(session, analysis, style=style)
 
     def lookup(self, session: str, entry: str | None) -> Analysis | None:
         if not entry:
@@ -199,7 +207,13 @@ class Workspace:
         return analysis
 
     def refilter(
-        self, session: str, entry: str | None, threshold, classes, model_key: str | None = None
+        self,
+        session: str,
+        entry: str | None,
+        threshold,
+        classes,
+        model_key: str | None = None,
+        style=None,
     ) -> Result:
         try:
             analysis = self.lookup(session, entry)
@@ -215,20 +229,35 @@ class Workspace:
             self.history.update(session, analysis)
         except Exception:
             traceback.print_exc()
-        return self.render(session, analysis, light=True)
+        return self.render(session, analysis, light=True, style=style)
 
-    def reopen(self, session: str, entry: str | None) -> Result:
+    def restyle(self, session: str, entry: str | None, style: str) -> Result:
+        try:
+            analysis = self.lookup(session, entry)
+        except Exception as error:
+            return Result(False, f"The stored analysis could not be read: {error}")
+        if analysis is None:
+            return Result(False, "Analyse a photo first.")
+        return self.render(session, analysis, light=True, style=style)
+
+    def reopen(self, session: str, entry: str | None, style=None) -> Result:
         try:
             analysis = self.history.open(session, entry or "")
         except Exception as error:
             return Result(False, f"That history entry could not be opened: {error}")
         analysis.reopened = True
         self.remember(session, analysis)
-        return self.render(session, analysis)
+        return self.render(session, analysis, style=style)
 
-    def render(self, session: str, analysis: Analysis, light: bool = False) -> Result:
+    def draw(self, analysis: Analysis, style=None) -> np.ndarray:
         shown = analysis.shown()
-        annotated = annotate(analysis.work, shown)
+        if style is None:
+            return annotate(analysis.work, shown)
+        return marks.render(analysis.display, shown, analysis.size, style)
+
+    def render(self, session: str, analysis: Analysis, light: bool = False, style=None) -> Result:
+        shown = analysis.shown()
+        annotated = self.draw(analysis, style)
         exports = self.history.folder(session, analysis.entry) / "exports"
         exports.mkdir(parents=True, exist_ok=True)
         png = exports / "annotated.png"
@@ -236,9 +265,9 @@ class Workspace:
         csv_path = write_csv(shown, analysis.size, exports / "results.csv")
         return Result(
             ok=True,
-            message=summary(analysis),
+            message=text_summary(analysis),
             entry=analysis.entry,
-            display=None if light else analysis.display,
+            display=None if light and style is None else analysis.display,
             annotated=annotated,
             rows=rows(shown, analysis.size),
             model_input=None if light else analysis.model_input.pixels,
@@ -249,6 +278,12 @@ class Workspace:
             classes=list(analysis.classes),
             model_key=analysis.model_key,
             light=light,
+            verdict=summary.verdict(analysis),
+            tiles=summary.tiles(shown, analysis.classes),
+            closeups=[]
+            if style is None
+            else closeups.crops(analysis.display, shown, analysis.size),
+            style=style,
         )
 
     def report(self, session: str, entry: str | None) -> tuple[Path | None, str]:
@@ -264,6 +299,7 @@ class Workspace:
                 analysis,
                 card.headline(self.cards.get(analysis.model_key)),
                 folder / "report.pdf",
+                branding=self.branding,
             )
         except Exception as error:
             traceback.print_exc()
@@ -298,6 +334,67 @@ class Workspace:
             charts.image_chart(records),
             charts.confidence_chart(records),
         )
+
+    def compare(self, session: str, source, stretch=False, style=marks.DEFAULT_STYLE):
+        results = []
+        for key, slot in self.slots.items():
+            if not slot.ready:
+                results.append(
+                    (key, Result(False, f"{slot.spec.name} is unavailable: {slot.reason}."))
+                )
+                continue
+            threshold = self.threshold_for(key)
+            results.append(
+                (key, self.analyse(session, source, key, threshold, CLASSES, stretch, style))
+            )
+        tallies = [
+            (self.slots[key].spec.name, {tile["name"]: tile["count"] for tile in result.tiles})
+            for key, result in results
+            if result.ok
+        ]
+        return results, summary.compare_sentence(tallies)
+
+    def slider_for(self, session: str, entry: str | None, key: str) -> float:
+        analysis = self.current.get(session)
+        if analysis is not None and entry and analysis.entry == entry and analysis.model_key == key:
+            return analysis.threshold
+        return self.threshold_for(key)
+
+    def chips(self) -> list[dict]:
+        return [summary.chip(slot) for slot in self.slots.values()]
+
+    def picker(self) -> list[tuple[str, str]]:
+        out = []
+        for key, slot in self.slots.items():
+            state = summary.chip(slot)["label"]
+            entry = self.cards.get(key) or {}
+            figure = (
+                f"validation mask AP50 {entry['value']:.3f}"
+                if entry.get("value") is not None
+                else "not evaluated yet"
+            )
+            out.append((f"{slot.spec.name}  |  {state}  |  {figure}", key))
+        return out
+
+    def cards_for(self, session: str) -> list[dict]:
+        out = []
+        for meta in self.history.entries(session):
+            thumb = self.history.thumb(session, meta["entry"])
+            out.append(
+                {
+                    "entry": meta["entry"],
+                    "thumb": str(thumb) if thumb.is_file() else None,
+                    "caption": summary.card_caption(meta),
+                }
+            )
+        return out
+
+    def clear(self, session: str) -> int:
+        self.current.pop(session, None)
+        return self.history.clear(session)
+
+    def stats(self, session: str) -> list[tuple[str, str]]:
+        return summary.stat_tiles(charts.collect(self.history, session))
 
 
 def cleanup(history: History) -> str:

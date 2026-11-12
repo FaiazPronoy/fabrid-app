@@ -190,6 +190,14 @@ class History:
             stretch=bool(meta.get("stretch", False)),
         )
 
+    def clear(self, session: str) -> int:
+        folder = self.folder(session)
+        if not folder.is_dir():
+            return 0
+        count = len(list(folder.glob("*/meta.json")))
+        shutil.rmtree(folder)
+        return count
+
     def prune(self, max_age_hours: float = MAX_AGE_HOURS, now: float | None = None) -> int:
         if not self.root.is_dir():
             return 0

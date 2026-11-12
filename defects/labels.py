@@ -1,9 +1,9 @@
 CLASSES = ("needle mark", "hole", "missing yarn", "stain")
 COLORS = {
-    "needle mark": (230, 25, 75),
-    "hole": (0, 130, 200),
-    "missing yarn": (245, 160, 0),
-    "stain": (60, 180, 75),
+    "needle mark": (136, 34, 85),
+    "hole": (51, 136, 238),
+    "missing yarn": (221, 170, 51),
+    "stain": (17, 119, 51),
 }
 
 

@@ -2,7 +2,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from defects import card, examples, settings, verify
+from defects import branding, card, examples, settings, verify
 from defects.history import History
 from defects.models import load_all
 from defects.registry import MODELS
@@ -10,12 +10,14 @@ from defects.service import Workspace, cleanup
 
 ROOT = Path(__file__).resolve().parent
 REFERENCE = ROOT / "reference"
+BRANDING = ROOT / "branding.json"
 
 
 def options(argv=None, env=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Fabric defect inspection web app")
     parser.add_argument("--lan", action="store_true", help="listen on the local network")
     parser.add_argument("--share", action="store_true", help="create a public Gradio link")
+    parser.add_argument("--classic", action="store_true", help="start the previous interface")
     parser.add_argument("--port", type=int, default=None)
     settings.add_folders(parser)
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
@@ -28,7 +30,8 @@ def workspace(weights: Path | None, data: Path) -> Workspace:
     print(cleanup(history), flush=True)
     slots = load_all(MODELS, ROOT, folder=weights)
     verify.apply(slots, ROOT, REFERENCE, folder=weights)
-    return Workspace(slots, history, card.read(ROOT / "model_card.json"))
+    cards = card.read(ROOT / "model_card.json")
+    return Workspace(slots, history, cards, branding.read(BRANDING))
 
 
 def public_line(share: bool, share_url: str | None, local_url: str | None) -> str:
@@ -39,24 +42,42 @@ def public_line(share: bool, share_url: str | None, local_url: str | None) -> st
     return f"LOCAL URL: {local_url}"
 
 
+def interface(classic: bool):
+    if classic:
+        from defects.classic import build
+
+        return build, {}
+    from defects.ui import build, launch_options
+
+    return build, launch_options()
+
+
+def addresses(demo, launched) -> tuple[str | None, str | None]:
+    share_url = getattr(demo, "share_url", None)
+    local_url = getattr(demo, "local_url", None)
+    if isinstance(launched, tuple) and len(launched) >= 3:
+        local_url = local_url or launched[1]
+        share_url = share_url or launched[2]
+    return share_url, local_url
+
+
 def main(argv=None) -> None:
     args = options(argv)
-    from defects.ui import build
-
+    build, extra = interface(args.classic)
     args.data.mkdir(parents=True, exist_ok=True)
     print(f"weights folder: {args.weights or ROOT / 'weights'}", flush=True)
     print(f"data folder: {args.data}", flush=True)
+    print(f"interface: {'classic' if args.classic else 'redesigned'}", flush=True)
     demo = build(workspace(args.weights, args.data), examples.listing(REFERENCE))
-    demo.queue(default_concurrency_limit=1, max_size=32).launch(
+    launched = demo.queue(default_concurrency_limit=1, max_size=32).launch(
         server_name="0.0.0.0" if args.lan else None,
         server_port=args.port,
         share=args.share,
         allowed_paths=[str(args.data), str(REFERENCE)],
         prevent_thread_lock=True,
+        **extra,
     )
-    share_url = getattr(demo, "share_url", None)
-    local_url = getattr(demo, "local_url", None)
-    print(public_line(args.share, share_url, local_url), flush=True)
+    print(public_line(args.share, *addresses(demo, launched)), flush=True)
     demo.block_thread()
 
 

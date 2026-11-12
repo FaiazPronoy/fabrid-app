@@ -91,6 +91,14 @@ def commands(folder: Path | None, data: Path) -> tuple[list[str], list[str]]:
     return check, app
 
 
+def ui_check() -> list[str]:
+    return [sys.executable, "-u", "-m", "defects.uicheck"]
+
+
+def choose(app: list[str], passed: bool) -> list[str]:
+    return app if passed else [*app, "--classic"]
+
+
 def banner(text: str) -> str:
     line = "=" * 72
     return f"{line}\n{text}\n{line}"
@@ -132,7 +140,13 @@ def main() -> None:
             banner("WARNING: the readiness check reports NOT READY. Starting the app anyway."),
             flush=True,
         )
-    code = stream(app, REPO)
+    passed = stream(ui_check(), REPO) == 0
+    if not passed:
+        print(
+            banner("WARNING: the interface check failed. Starting the classic interface instead."),
+            flush=True,
+        )
+    code = stream(choose(app, passed), REPO)
     raise SystemExit(f"app stopped with code {code}")
 
 

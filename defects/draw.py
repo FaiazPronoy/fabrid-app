@@ -2,6 +2,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 from defects.labels import COLORS
+from defects.palette import text_on
 from defects.prediction import Instance
 
 ALPHA = 0.45
@@ -61,6 +62,6 @@ def annotate(pixels: np.ndarray, found: list[Instance]) -> np.ndarray:
             (tag_x, tag_y, tag_x + text_w + 2 * pad, tag_y + text_h + 2 * pad), fill=color
         )
         draw.text(
-            (tag_x + pad - left, tag_y + pad - top), text, fill=(255, 255, 255), font=text_font
+            (tag_x + pad - left, tag_y + pad - top), text, fill=text_on(color), font=text_font
         )
     return np.asarray(image)
