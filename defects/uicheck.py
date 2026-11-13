@@ -110,6 +110,7 @@ def plan(state: dict) -> list[tuple[str, callable]]:
         ("history_tab", lambda: (state["session"],)),
         ("history_refresh", lambda: (state["session"],)),
         ("history_pick", lambda: (state["session"], SimpleNamespace(index=0))),
+        ("history_choose", lambda: (state["session"], state["entry"])),
         (
             "history_open",
             lambda: (state["session"], state["entry"], state["entry"], 0.5, every, second, "mask"),

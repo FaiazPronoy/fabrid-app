@@ -112,9 +112,25 @@ def compare_values(workspace, results: list[tuple[str, Result]], sentence: str) 
 
 def history_values(cards: list[dict]) -> tuple[list, list, str]:
     gallery = [(item["thumb"], item["caption"]) for item in cards if item["thumb"]]
-    choices = [(item["caption"], item["entry"]) for item in cards]
+    choices = [(item.get("label", item["caption"]), item["entry"]) for item in cards]
     empty = summary.empty_html("History is empty", HISTORY_EMPTY) if not cards else ""
     return gallery, choices, empty
+
+
+def index_of(cards: list[dict], entry: str | None) -> int | None:
+    shown = [item["entry"] for item in cards if item["thumb"]]
+    return shown.index(entry) if entry in shown else None
+
+
+def scroll_js(element: str, skip_on_error: bool) -> str:
+    guard = "if (box.querySelector('.fd-error')) { return; }" if skip_on_error else ""
+    return (
+        "() => { const box = document.getElementById('" + element + "'); "
+        "if (!box) { return; } " + guard + " "
+        "const top = box.getBoundingClientRect().top; "
+        "if (top > window.innerHeight * 0.4) { "
+        "box.scrollIntoView({behavior: 'smooth', block: 'start'}); } }"
+    )
 
 
 def entry_at(cards: list[dict], index) -> str | None:

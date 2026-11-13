@@ -282,7 +282,7 @@ class Workspace:
             tiles=summary.tiles(shown, analysis.classes),
             closeups=[]
             if style is None
-            else closeups.crops(analysis.display, shown, analysis.size),
+            else closeups.crops(analysis.display, shown, analysis.size, style),
             style=style,
         )
 
@@ -385,6 +385,7 @@ class Workspace:
                     "entry": meta["entry"],
                     "thumb": str(thumb) if thumb.is_file() else None,
                     "caption": summary.card_caption(meta),
+                    "label": summary.card_label(meta),
                 }
             )
         return out

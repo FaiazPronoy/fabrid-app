@@ -1,30 +1,48 @@
+import math
+
 import numpy as np
 
+from defects import marks
 from defects.marks import factors, scale_box
 from defects.prediction import Instance
 
-MARGIN = 0.35
-MIN_PAD = 16
+CONTEXT = 3.0
+MIN_SIDE = 200
+LIMIT = 24
+
+
+def span(low: float, high: float, limit: int) -> tuple[int, int]:
+    length = max(1.0, high - low)
+    start, end = low - CONTEXT * length, high + CONTEXT * length
+    if end - start < MIN_SIDE:
+        grow = (MIN_SIDE - (end - start)) / 2
+        start, end = start - grow, end + grow
+    start, end = math.floor(start), math.ceil(end)
+    if end - start >= limit:
+        return 0, limit
+    if start < 0:
+        start, end = 0, end - start
+    if end > limit:
+        start, end = start - (end - limit), limit
+    return max(0, start), min(limit, end)
 
 
 def bounds(box, width: int, height: int) -> tuple[int, int, int, int]:
     x0, y0, x1, y1 = box
-    pad = max(MIN_PAD, MARGIN * max(x1 - x0, y1 - y0))
-    left, top = max(0, int(np.floor(x0 - pad))), max(0, int(np.floor(y0 - pad)))
-    right, bottom = min(width, int(np.ceil(x1 + pad))), min(height, int(np.ceil(y1 + pad)))
-    if right <= left:
-        right = min(width, left + 1)
-    if bottom <= top:
-        bottom = min(height, top + 1)
+    left, right = span(x0, x1, width)
+    top, bottom = span(y0, y1, height)
     return left, top, right, bottom
 
 
-def crops(display, found: list[Instance], size: tuple[int, int]) -> list[tuple[np.ndarray, str]]:
+def crops(
+    display, found: list[Instance], size: tuple[int, int], style: str = marks.DEFAULT_STYLE
+) -> list[tuple[np.ndarray, str]]:
     pixels = np.asarray(display)
     height, width = pixels.shape[:2]
     sx, sy = factors(size, (width, height))
     out = []
-    for item in sorted(found, key=lambda entry: -entry.score):
+    for item in sorted(found, key=lambda entry: -entry.score)[:LIMIT]:
         left, top, right, bottom = bounds(scale_box(item.box, sx, sy), width, height)
-        out.append((pixels[top:bottom, left:right].copy(), f"{item.label} {item.score:.2f}"))
+        marked = marks.render(pixels, [item], size, style, labels=False)
+        out.append((marked[top:bottom, left:right].copy(), f"{item.label} {item.score:.2f}"))
     return out

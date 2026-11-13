@@ -176,6 +176,10 @@ def build(
         gallery, choices, empty = screens.history_values(cards)
         return session, gallery, gr.update(choices=choices, value=None), empty
 
+    def on_choose(session, chosen):
+        session = workspace.session(session)
+        return gr.update(selected_index=screens.index_of(workspace.cards_for(session), chosen))
+
     def on_pick(session, evt: gr.SelectData):
         session = workspace.session(session)
         chosen = screens.entry_at(workspace.cards_for(session), getattr(evt, "index", None))
@@ -290,6 +294,7 @@ def build(
                             step=0.05,
                             value=workspace.threshold_for(default_key),
                             label="Confidence threshold",
+                            elem_classes=["fd-threshold"],
                         )
                         classes = gr.CheckboxGroup(
                             choices=list(CLASSES), value=list(CLASSES), label="Classes to show"
@@ -301,7 +306,9 @@ def build(
                         )
                         stretch = gr.Checkbox(value=False, label=STRETCH_LABEL)
                         gr.Markdown(STRETCH_NOTE)
-                with gr.Column(scale=7, min_width=300, elem_classes=["fd-panel"]):
+                with gr.Column(
+                    scale=7, min_width=300, elem_classes=["fd-panel"], elem_id="fd-result"
+                ):
                     status = gr.HTML(summary.empty_html())
                     with gr.Column(visible=False) as result_box:
                         tiles = gr.HTML()
@@ -321,7 +328,9 @@ def build(
                                 height="auto",
                                 object_fit="contain",
                                 allow_preview=True,
+                                preview=False,
                                 interactive=False,
+                                elem_classes=["fd-crops"],
                             )
                         with gr.Accordion("Model input", open=False):
                             model_input = gr.Image(
@@ -361,7 +370,9 @@ def build(
                         "Run both models", variant="primary", elem_classes=["fd-analyse"]
                     )
                     gr.Markdown(summary.COMPARE_NOTE)
-                with gr.Column(scale=8, min_width=300, elem_classes=["fd-panel"]):
+                with gr.Column(
+                    scale=8, min_width=300, elem_classes=["fd-panel"], elem_id="fd-compare-result"
+                ):
                     compare_outputs = []
                     with gr.Row(equal_height=False):
                         for slot in workspace.slots.values():
@@ -389,11 +400,13 @@ def build(
                 )
                 gallery = gr.Gallery(
                     show_label=False,
-                    columns=3,
+                    columns=5,
                     height="auto",
                     object_fit="cover",
                     allow_preview=False,
+                    preview=False,
                     interactive=False,
+                    elem_classes=["fd-history"],
                 )
                 chosen = gr.Dropdown(choices=[], label="Analysis to open")
                 with gr.Row():
@@ -463,6 +476,7 @@ def build(
         )
         done = wire("analyse_unlock", ran.then, unlock_analyse, [], [analyse])
         wire("analyse_history", done.then, on_history, [session], history_outputs)
+        done.then(None, js=screens.scroll_js("fd-result", True))
         filter_inputs = [threshold, classes, style, model, session, entry]
         wire(
             "filter_threshold",
@@ -512,9 +526,11 @@ def build(
         )
         compare_done = wire("compare_unlock", compared.then, unlock_compare, [], [compare_button])
         wire("compare_history", compare_done.then, on_history, [session], history_outputs)
+        compare_done.then(None, js=screens.scroll_js("fd-compare-result", False))
         wire("history_tab", history_tab.select, on_history, [session], history_outputs)
         wire("history_refresh", refresh.click, on_history, [session], history_outputs)
         wire("history_pick", gallery.select, on_pick, [session], [chosen])
+        wire("history_choose", chosen.change, on_choose, [session, chosen], [gallery])
         wire(
             "history_open",
             reopen.click,

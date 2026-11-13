@@ -45,15 +45,27 @@ def color(rgb) -> tuple[float, float, float]:
     return tuple(v / 255 for v in rgb)
 
 
-def header(figure: Figure, branding: Branding) -> float:
-    figure.text(LEFT, 0.955, branding.title, fontsize=17, weight="bold", color=color(TEXT))
-    top = 0.935
-    if branding.subtitle:
-        figure.text(LEFT, top, branding.subtitle, fontsize=9.5, color=color(MUTED))
-        top -= 0.017
+TITLE_CHARS = 52
+SUBTITLE_CHARS = 100
+LINE_CHARS = 112
+
+
+def header_lines(branding: Branding) -> list[tuple[str, float, str, tuple]]:
+    lines = [(part, 17, "bold", TEXT) for part in textwrap.wrap(branding.title, TITLE_CHARS)]
+    for part in textwrap.wrap(branding.subtitle, SUBTITLE_CHARS):
+        lines.append((part, 9.5, "normal", MUTED))
     for line in branding.lines():
-        figure.text(LEFT, top, line, fontsize=8.5, color=color(MUTED))
-        top -= 0.015
+        lines.extend((part, 8.5, "normal", MUTED) for part in textwrap.wrap(line, LINE_CHARS))
+    return lines
+
+
+def header(figure: Figure, branding: Branding) -> float:
+    top = 0.965
+    for text, size, weight, ink in header_lines(branding):
+        step = size / 72 / A4[1] * 1.35
+        top -= step
+        figure.text(LEFT, top, text, fontsize=size, weight=weight, color=color(ink))
+    top -= 0.008
     figure.add_artist(
         FancyBboxPatch(
             (LEFT, top - 0.004),

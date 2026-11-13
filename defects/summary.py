@@ -75,7 +75,18 @@ def compare_sentence(results: list[tuple[str, dict[str, int]]]) -> str:
     return sentence
 
 
+def short_name(name: str) -> str:
+    return name.split(" (", 1)[0]
+
+
 def card_caption(meta: dict) -> str:
+    when = meta["created"].replace("T", " ")[11:16]
+    total = meta["total"]
+    result = f"{total} {noun(total)}" if total else "no defect"
+    return f"{when} | {short_name(meta['model_name'])} | {result}"
+
+
+def card_label(meta: dict) -> str:
     when = meta["created"].replace("T", " ")[:16]
     total = meta["total"]
     found = [f"{name} {n}" for name, n in meta["counts"].items() if n]

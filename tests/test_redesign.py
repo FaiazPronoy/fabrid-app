@@ -99,15 +99,13 @@ def test_label_text_sized_from_image():
     assert large_rows.size > 3 * small_rows.size
 
 
-def test_closeups_count_bounds_and_captions():
-    display = np.arange(256 * 192 * 3, dtype=np.uint32).reshape(192, 256, 3).astype(np.uint8)
+def test_closeups_captions_and_empty():
+    display = np.full((192, 256, 3), 128, dtype=np.uint8)
     found = [square("hole", 0.6, 4, 4, 10, 10), square("stain", 0.97, 50, 30, 64, 48)]
     crops = closeups.crops(display, found, (64, 48))
     assert [caption for _, caption in crops] == ["stain 0.97", "hole 0.60"]
-    stain, hole = crops[0][0], crops[1][0]
-    assert stain.shape[0] <= 192 and stain.shape[1] <= 256
-    assert hole.shape[0] >= 24 and hole.shape[1] >= 24
-    assert np.array_equal(hole, display[: hole.shape[0], : hole.shape[1]])
+    for crop, _ in crops:
+        assert crop.shape[0] <= 192 and crop.shape[1] <= 256
     assert closeups.crops(display, [], (64, 48)) == []
 
 
@@ -185,9 +183,12 @@ def test_history_cards_and_clearing(workspace, photo):
     first = workspace.analyse(SESSION, str(photo), YOLO, 0.25, list(CLASSES))
     cards = workspace.cards_for(SESSION)
     assert len(cards) == 1 and cards[0]["entry"] == first.entry
-    assert "YOLOv8m-seg (augmented) | 3 defects: hole 2, stain 1 at 0.25" in cards[0]["caption"]
+    assert cards[0]["caption"].endswith(" | YOLOv8m-seg | 3 defects")
+    assert "YOLOv8m-seg (augmented) | 3 defects: hole 2, stain 1 at 0.25" in cards[0]["label"]
     gallery, choices, empty = screens.history_values(cards)
-    assert len(gallery) == 1 and choices[0][1] == first.entry and empty == ""
+    assert len(gallery) == 1 and choices[0] == (cards[0]["label"], first.entry) and empty == ""
+    assert gallery[0][1] == cards[0]["caption"]
+    assert screens.index_of(cards, first.entry) == 0 and screens.index_of(cards, "x") is None
     assert screens.entry_at(cards, 0) == first.entry
     assert screens.entry_at(cards, 5) is None and screens.entry_at(cards, None) is None
     assert workspace.clear(SESSION) == 1

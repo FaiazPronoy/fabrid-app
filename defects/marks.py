@@ -98,7 +98,13 @@ def label(draw: ImageDraw.ImageDraw, item: Instance, box, text_font, pad: int, s
     draw.text((tag_x + pad - left, tag_y + pad - top), text, fill=text_on(color), font=text_font)
 
 
-def render(display, found: list[Instance], size: tuple[int, int], style: str = DEFAULT_STYLE):
+def render(
+    display,
+    found: list[Instance],
+    size: tuple[int, int],
+    style: str = DEFAULT_STYLE,
+    labels: bool = True,
+):
     if style not in STYLES:
         raise ValueError(f"unknown mark style {style}")
     canvas = np.array(display, dtype=np.uint8, copy=True)
@@ -125,5 +131,6 @@ def render(display, found: list[Instance], size: tuple[int, int], style: str = D
             draw.ellipse(
                 (x0 - grow_x, y0 - grow_y, x1 + grow_x, y1 + grow_y), outline=color, width=thickness
             )
-        label(draw, item, box, text_font, pad, image.size)
+        if labels:
+            label(draw, item, box, text_font, pad, image.size)
     return np.asarray(image)

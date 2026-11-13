@@ -17,10 +17,21 @@ gradio-app,
   color-scheme: light;
 }
 
+html,
+body {
+  overflow-x: hidden;
+}
+
 .gradio-container {
   max-width: 1320px !important;
   margin: 0 auto !important;
-  overflow-x: hidden;
+}
+
+.fd-panel,
+.fd-panel *:not(.fd-table-wrap):not(.fd-crops):not(.fd-crops *):not(.fd-history):not(
+    .fd-history *
+  ) {
+  overflow-x: clip !important;
 }
 
 footer {
@@ -40,11 +51,17 @@ footer {
   border-radius: 14px;
 }
 
+.fd-brand {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
 .fd-title {
   font-size: 1.75rem;
   font-weight: 700;
   line-height: 1.2;
   color: var(--fd-text);
+  overflow-wrap: anywhere;
 }
 
 .fd-subtitle {
@@ -53,9 +70,15 @@ footer {
   color: var(--fd-muted);
 }
 
+.fd-subtitle,
+.fd-brand-line {
+  overflow-wrap: anywhere;
+}
+
 .fd-brand-line {
   margin-top: 2px;
   font-size: 0.875rem;
+  line-height: 1.4;
   color: var(--fd-muted);
 }
 
@@ -236,7 +259,7 @@ button {
 
 .fd-table-wrap {
   max-width: 100%;
-  overflow-x: auto;
+  overflow-x: auto !important;
   border: 1px solid var(--fd-border);
   border-radius: 10px;
 }
@@ -332,7 +355,71 @@ button {
   white-space: normal;
 }
 
+.fd-threshold input[type="number"] {
+  width: 5.5em !important;
+  min-width: 5.5em !important;
+}
+
+.fd-threshold .head,
+.fd-threshold .tab-like-container {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fd-crops .grid-wrap,
+.fd-history .grid-wrap {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.fd-crops .grid-container {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  grid-auto-rows: 140px !important;
+}
+
+.fd-history .grid-container {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  grid-auto-rows: 150px !important;
+}
+
+.fd-crops .thumbnail-item,
+.fd-history .thumbnail-item {
+  height: 100% !important;
+  width: 100% !important;
+  aspect-ratio: auto !important;
+}
+
+.fd-crops .thumbnail-item img {
+  object-fit: contain !important;
+  background: var(--fd-faint);
+}
+
+.fd-crops .caption-label,
+.fd-history .caption-label {
+  max-width: 100%;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  font-size: 0.8rem;
+  line-height: 1.25;
+  background: rgba(17, 24, 39, 0.82) !important;
+  color: #ffffff !important;
+}
+
+.fd-history .thumbnail-item.selected,
+.fd-history button.selected {
+  outline: 4px solid var(--fd-accent) !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px rgba(67, 56, 202, 0.25) !important;
+}
+
 @media (max-width: 767px) {
+  .fd-crops .grid-container,
+  .fd-history .grid-container {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
   .fd-header {
     padding: 14px 16px;
   }
