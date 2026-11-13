@@ -193,7 +193,8 @@ then start it with `python app.py --lan` and leave it running.
 
 **3. What to show, in this order.**
 
-1. Point at the header: each model's chip says Verified.
+1. Point at the header: each model's chip says Verified. If the page is dark on the projector
+   browser, press Light / dark once; the browser then keeps the light page.
 2. Inspect tab, YOLOv8m-seg selected. Click an example image under step 1, press Analyse. Read
    the verdict banner, the four class tiles, then drag the before and after handle. Open Defect
    close-ups and Defect details.
@@ -256,8 +257,11 @@ page as reopened, with no new inference run.
 The page has a header with the project title, an optional subtitle, institution, team and
 supervisor lines from `branding.json` (empty fields are not shown), and one status chip per model:
 Verified, Not verified or Unavailable. Tap or hover a chip for the reason. A short limits line sits
-under every tab. The page always uses one light theme, whatever the visitor's system setting, and
-the four class colours (needle mark wine, hole blue, missing yarn sand, stain green) are used for
+under every tab. The page opens in a light theme, whatever the visitor's system setting, because
+projectors wash out dark pages. The "Light / dark" button next to the header switches to a dark
+theme and the browser remembers the choice; both themes are checked for contrast. Charts and the PDF
+report stay light. Every collapsible section shows a chevron that points right when closed and
+down when open, and the whole header row can be tapped. The four class colours (needle mark wine, hole blue, missing yarn sand, stain green) are used for
 the tiles, table chips, marks and charts. They were chosen so that every pair stays at least 20
 CIELAB units apart under simulated protanopia, deuteranopia and tritanopia, and every label and
 text colour reaches a contrast ratio of at least 4.5 to 1; `defects/palette.py` holds the check.

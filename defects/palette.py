@@ -37,6 +37,52 @@ SIMULATIONS = {
         (0.004733, 0.691367, 0.303900),
     ),
 }
+MODES = {
+    "light": {
+        "bg": BACKGROUND,
+        "card": CARD,
+        "border": BORDER,
+        "text": TEXT,
+        "muted": MUTED,
+        "accent": ACCENT,
+        "accent-fill": ACCENT,
+        "accent-hover": ACCENT_HOVER,
+        "faint": FAINT,
+        "faint-text": FAINT_TEXT,
+        "hover": FAINT,
+        "clear-fill": VERDICTS["clear"]["fill"],
+        "clear-edge": VERDICTS["clear"]["edge"],
+        "clear-text": VERDICTS["clear"]["text"],
+        "found-fill": VERDICTS["found"]["fill"],
+        "found-edge": VERDICTS["found"]["edge"],
+        "found-text": VERDICTS["found"]["text"],
+        "error-fill": VERDICTS["error"]["fill"],
+        "error-edge": VERDICTS["error"]["edge"],
+        "error-text": VERDICTS["error"]["text"],
+    },
+    "dark": {
+        "bg": (15, 23, 42),
+        "card": (23, 32, 51),
+        "border": (51, 65, 85),
+        "text": (241, 245, 249),
+        "muted": (176, 186, 200),
+        "accent": (165, 180, 252),
+        "accent-fill": (79, 70, 229),
+        "accent-hover": (67, 56, 202),
+        "faint": (36, 48, 70),
+        "faint-text": (176, 186, 200),
+        "hover": (36, 48, 70),
+        "clear-fill": (17, 51, 35),
+        "clear-edge": (52, 211, 153),
+        "clear-text": (187, 247, 208),
+        "found-fill": (61, 43, 10),
+        "found-edge": (245, 158, 11),
+        "found-text": (253, 230, 138),
+        "error-fill": (64, 20, 20),
+        "error-edge": (248, 113, 113),
+        "error-text": (254, 202, 202),
+    },
+}
 MIN_TEXT_CONTRAST = 4.5
 MIN_DISTANCE = 20.0
 
@@ -104,3 +150,25 @@ def text_pairs() -> dict[str, float]:
     for kind, colors in VERDICTS.items():
         pairs[f"{kind} verdict"] = contrast(colors["text"], colors["fill"])
     return pairs
+
+
+def mode_pairs(mode: str) -> dict[str, float]:
+    tokens = MODES[mode]
+    pairs = {
+        "text on background": contrast(tokens["text"], tokens["bg"]),
+        "text on card": contrast(tokens["text"], tokens["card"]),
+        "muted on card": contrast(tokens["muted"], tokens["card"]),
+        "muted on background": contrast(tokens["muted"], tokens["bg"]),
+        "faint text on faint tile": contrast(tokens["faint-text"], tokens["faint"]),
+        "text on hover": contrast(tokens["text"], tokens["hover"]),
+        "accent on card": contrast(tokens["accent"], tokens["card"]),
+        "white on accent button": contrast(WHITE, tokens["accent-fill"]),
+        "white on accent hover": contrast(WHITE, tokens["accent-hover"]),
+    }
+    for kind in ("clear", "found", "error"):
+        pairs[f"{kind} verdict"] = contrast(tokens[f"{kind}-text"], tokens[f"{kind}-fill"])
+    return pairs
+
+
+def css_variables(mode: str) -> dict[str, str]:
+    return {f"--fd-{name}": hexcode(value) for name, value in MODES[mode].items()}

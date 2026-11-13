@@ -5,27 +5,15 @@ from pathlib import Path
 import gradio as gr
 
 from defects import examples, marks, screens, summary
+from defects.appearance import MODE_JS, TOGGLE_JS, theme_values
 from defects.branding import Branding
 from defects.labels import CLASSES
-from defects.palette import ACCENT, ACCENT_HOVER, BACKGROUND, BORDER, CARD, MUTED, TEXT, hexcode
 from defects.service import STRETCH_LABEL, STRETCH_NOTE, Result, Workspace
 from defects.texts import LIMITS
 
 CSS_PATH = Path(__file__).with_name("style.css")
 MIN_THRESHOLD = 0.05
 FONTS = ["ui-sans-serif", "system-ui", "Segoe UI", "Roboto", "Helvetica", "Arial", "sans-serif"]
-LIGHT_JS = """
-() => {
-  const strip = () => {
-    document.documentElement.classList.remove('dark');
-    document.body.classList.remove('dark');
-  };
-  strip();
-  const watch = new MutationObserver(strip);
-  watch.observe(document.documentElement, {attributes: true, attributeFilter: ['class']});
-  watch.observe(document.body, {attributes: true, attributeFilter: ['class']});
-}
-"""
 
 
 def show(flag: bool):
@@ -41,29 +29,15 @@ class Wire:
 
 
 def theme():
-    light = {
-        "body_background_fill": hexcode(BACKGROUND),
-        "body_text_color": hexcode(TEXT),
-        "body_text_color_subdued": hexcode(MUTED),
-        "background_fill_primary": hexcode(CARD),
-        "background_fill_secondary": hexcode(BACKGROUND),
-        "block_background_fill": hexcode(CARD),
-        "block_border_color": hexcode(BORDER),
-        "border_color_primary": hexcode(BORDER),
-        "button_primary_background_fill": hexcode(ACCENT),
-        "button_primary_background_fill_hover": hexcode(ACCENT_HOVER),
-        "button_primary_text_color": "#ffffff",
-    }
-    both = {**light, **{f"{name}_dark": value for name, value in light.items()}}
     base = gr.themes.Base(primary_hue="indigo", neutral_hue="slate", radius_size="md", font=FONTS)
-    return base.set(**both)
+    return base.set(**theme_values())
 
 
 def launch_options() -> dict:
     return {
         "theme": theme(),
         "css": CSS_PATH.read_text(encoding="utf-8"),
-        "js": LIGHT_JS,
+        "js": MODE_JS,
         "footer_links": [],
     }
 
@@ -249,7 +223,9 @@ def build(
     with gr.Blocks(title=branding.title) as demo:
         session = gr.State("")
         entry = gr.State("")
-        gr.HTML(summary.header_html(branding, workspace.chips()))
+        with gr.Row(equal_height=False, elem_classes=["fd-top"]):
+            gr.HTML(summary.header_html(branding, workspace.chips()))
+            mode_button = gr.Button("Light / dark", scale=0, min_width=130, elem_id="fd-mode")
         with gr.Tabs() as tabs:
             with gr.Tab("Inspect", id="inspect"), gr.Row(equal_height=False):
                 with gr.Column(scale=5, min_width=300, elem_classes=["fd-panel"]):
@@ -281,13 +257,15 @@ def build(
                         show_label=False,
                         elem_classes=["fd-picker"],
                     )
-                    with gr.Accordion("More about this model", open=False):
+                    with gr.Accordion("More about this model", open=False, elem_classes=["fd-acc"]):
                         model_info = gr.Markdown(screens.model_text(workspace, default_key))
                     gr.HTML(
                         summary.step_html(3, "Analyse", "Runs the chosen model on the photo now.")
                     )
                     analyse = gr.Button("Analyse", variant="primary", elem_classes=["fd-analyse"])
-                    with gr.Accordion("Display and advanced settings", open=False):
+                    with gr.Accordion(
+                        "Display and advanced settings", open=False, elem_classes=["fd-acc"]
+                    ):
                         threshold = gr.Slider(
                             minimum=MIN_THRESHOLD,
                             maximum=0.95,
@@ -319,9 +297,9 @@ def build(
                             interactive=False,
                             max_height=620,
                         )
-                        with gr.Accordion("Defect details", open=False):
+                        with gr.Accordion("Defect details", open=False, elem_classes=["fd-acc"]):
                             details = gr.HTML()
-                        with gr.Accordion("Defect close-ups", open=False):
+                        with gr.Accordion("Defect close-ups", open=False, elem_classes=["fd-acc"]):
                             closeups = gr.Gallery(
                                 show_label=False,
                                 columns=4,
@@ -332,13 +310,13 @@ def build(
                                 interactive=False,
                                 elem_classes=["fd-crops"],
                             )
-                        with gr.Accordion("Model input", open=False):
+                        with gr.Accordion("Model input", open=False, elem_classes=["fd-acc"]):
                             model_input = gr.Image(
                                 label="Model input", interactive=False, buttons=["fullscreen"]
                             )
                             input_note = gr.Markdown("")
                         with (
-                            gr.Accordion("Downloads", open=False),
+                            gr.Accordion("Downloads", open=False, elem_classes=["fd-acc"]),
                             gr.Column(elem_classes=["fd-downloads"]),
                         ):
                             png_file = gr.File(label="Annotated image", interactive=False)
@@ -434,7 +412,7 @@ def build(
                 confidence = gr.Plot(show_label=False)
             with gr.Tab("About", id="about"), gr.Column(elem_classes=["fd-panel"]):
                 for title, text, opened in screens.about_sections(workspace, branding):
-                    with gr.Accordion(title, open=opened):
+                    with gr.Accordion(title, open=opened, elem_classes=["fd-acc"]):
                         if text.startswith("<div"):
                             gr.HTML(text)
                         else:
@@ -463,6 +441,7 @@ def build(
         dashboard_outputs = [session, stats, by_class, by_image, confidence]
 
         wire("load", demo.load, on_load, [session], [session])
+        mode_button.click(None, js=TOGGLE_JS)
         started = wire(
             "analyse_lock", analyse.click, lock, [], [analyse], queue=False, trigger_mode="once"
         )

@@ -124,21 +124,19 @@ def chip(slot) -> dict:
 
 
 def banner_html(result: dict) -> str:
-    colors = VERDICTS[result["kind"]]
+    if result["kind"] not in VERDICTS:
+        raise ValueError(f"unknown verdict kind {result['kind']}")
     notes = "".join(f"<div class='fd-note'>{escape(note)}</div>" for note in result["notes"])
     return (
-        f"<div class='fd-verdict fd-{result['kind']}' style='background:{hexcode(colors['fill'])};"
-        f"border-color:{hexcode(colors['edge'])};color:{hexcode(colors['text'])}'>"
+        f"<div class='fd-verdict fd-{result['kind']}'>"
         f"<div class='fd-verdict-title'>{escape(result['title'])}</div>"
         f"<div class='fd-verdict-detail'>{escape(result['detail'])}</div>{notes}</div>"
     )
 
 
 def error_html(message: str) -> str:
-    colors = VERDICTS["error"]
     return (
-        f"<div class='fd-verdict fd-error' style='background:{hexcode(colors['fill'])};"
-        f"border-color:{hexcode(colors['edge'])};color:{hexcode(colors['text'])}'>"
+        "<div class='fd-verdict fd-error'>"
         "<div class='fd-verdict-title'>The analysis could not be completed</div>"
         f"<div class='fd-verdict-detail'>{escape(message)}</div></div>"
     )
