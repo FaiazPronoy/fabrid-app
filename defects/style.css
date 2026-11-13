@@ -114,6 +114,24 @@ body {
 
 .fd-top {
   align-items: flex-start;
+  flex-wrap: wrap !important;
+  justify-content: flex-end;
+}
+
+.fd-top > :first-child {
+  flex: 1 1 280px !important;
+  min-width: min(100%, 280px) !important;
+}
+
+.fd-top > #fd-mode {
+  flex: 0 0 auto !important;
+}
+
+.fd-panel .prose,
+.fd-panel .prose *:not(.fd-table-wrap):not(.fd-table-wrap *) {
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  white-space: normal !important;
 }
 
 #fd-mode {
@@ -148,7 +166,7 @@ footer {
   font-weight: 700;
   line-height: 1.2;
   color: var(--fd-text);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .fd-subtitle {
@@ -348,6 +366,8 @@ button {
 }
 
 .fd-table-wrap {
+  contain: inline-size;
+  width: 100%;
   max-width: 100%;
   overflow-x: auto !important;
   border: 1px solid var(--fd-border);

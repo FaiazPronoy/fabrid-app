@@ -106,7 +106,7 @@ def test_gallery_grids_threshold_and_header_in_stylesheet():
     assert ".fd-history .grid-container" in phone and "repeat(2, minmax(0, 1fr))" in phone
     assert "5.5em" in rule('.fd-threshold input[type="number"]')
     assert "outline" in rule(".fd-history .thumbnail-item.selected, .fd-history button.selected")
-    assert "overflow-wrap: anywhere" in rule(".fd-title")
+    assert "overflow-wrap: break-word" in rule(".fd-title")
     assert "min-width: 0" in rule(".fd-brand")
 
 

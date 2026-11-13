@@ -118,3 +118,24 @@ def test_threshold_box_and_reset_are_not_cut():
     assert "40px" in css['.fd-threshold input[type="number"]']
     reset = css[".fd-threshold .reset-button"]
     assert "min-width: 40px" in reset and "min-height: 40px" in reset
+
+
+def test_text_in_panels_wraps_instead_of_widening_the_page():
+    css = rules()
+    selector = next(s for s in css if s.startswith(".fd-panel .prose,"))
+    assert ":not(.fd-table-wrap)" in selector and ":not(.fd-table-wrap *)" in selector
+    body = css[selector]
+    for part in ("overflow-wrap: anywhere", "word-break: break-word", "white-space: normal"):
+        assert part in body, part
+
+
+def test_table_cannot_widen_the_page():
+    body = rules()[".fd-table-wrap"]
+    assert "contain: inline-size" in body and "overflow-x: auto" in body
+
+
+def test_header_row_wraps_on_phones():
+    css = rules()
+    assert "flex-wrap: wrap" in css[".fd-top"]
+    assert "flex: 1 1 280px" in css[".fd-top > :first-child"]
+    assert "flex: 0 0 auto" in css[".fd-top > #fd-mode"]
